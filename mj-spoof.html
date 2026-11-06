@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0B0C0A">
+<title>MJ-SPoof — تزييف الموقع بالقمر الصناعي داخل معاً وحضوري</title>
+<meta name="description" content="لوحة تزييف موقع داخل تطبيقي معاً (1.0.18) وحضوري (8.3): طبقات قمر صناعي وهجين ومخطط، إحداثيات يدوية، تذبذب، وتجاوز فحوص الحماية لكل التطبيقات المدعومة. iOS 15.5 – 27 دون جيلبريك.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230B0C0A'/%3E%3Cpath d='M16 8c-3.9 0-7 3.1-7 7 0 5.2 7 10 7 10s7-4.8 7-10c0-3.9-3.1-7-7-7z' fill='none' stroke='%23D6A356' stroke-width='2'/%3E%3Ccircle cx='16' cy='15' r='2.6' fill='%23D6A356'/%3E%3C/svg%3E">
+<style>
+:root{
+  --ink:#0B0C0A; --ink2:#0F110E; --surface:#151814; --surface2:#1A1E19;
+  --line:rgba(226,235,222,.11); --line2:rgba(226,235,222,.055);
+  --tx:#E9EEE5; --tx2:#A7AFA2; --tx3:#7B8378;
+  --amber:#D6A356; --ok:#7FA97F; --bad:#C07068;
+  --mono:"SF Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+  --ui:"SF Arabic","SF Pro Text",system-ui,"Segoe UI",Tahoma,sans-serif;
+  --ease:cubic-bezier(.2,.6,.2,1);
+  --r:10px; --r2:14px; --r3:20px; --r4:26px;
+  --max:1160px;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--ink);color:var(--tx);font-family:var(--ui);
+  font-size:15px;line-height:1.8;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+::selection{background:var(--amber);color:var(--ink)}
+a{color:inherit;text-decoration:none}
+img{display:block;max-width:100%}
+h1,h2,h3,p,ul,ol,figure{margin:0}
+ul,ol{padding:0;list-style:none}
+svg{display:block}
+.i{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.5;
+  stroke-linecap:round;stroke-linejoin:round;flex:none}
+.wrap{width:100%;max-width:var(--max);margin-inline:auto;padding-inline:28px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums;direction:ltr;unicode-bidi:isolate}
+.skip{position:absolute;inset-inline-start:16px;top:-60px;z-index:99;background:var(--surface);
+  padding:10px 14px;border:1px solid var(--line);border-radius:var(--r);transition:top .18s var(--ease)}
+.skip:focus{top:14px}
+:focus-visible{outline:2px solid var(--amber);outline-offset:3px;border-radius:3px}
+
+/* page grid */
+.grid-bg{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:
+    linear-gradient(rgba(226,235,222,.035) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(226,235,222,.035) 1px,transparent 1px);
+  background-size:76px 76px;
+  -webkit-mask-image:radial-gradient(120% 80% at 50% 0%,#000 0%,#000 55%,transparent 100%);
+  mask-image:radial-gradient(120% 80% at 50% 0%,#000 0%,#000 55%,transparent 100%)}
+
+/* nav */
+.nav{position:sticky;top:0;z-index:60;background:rgba(11,12,10,.92);
+  border-bottom:1px solid var(--line)}
+.nav-inner{height:66px;display:flex;align-items:center;gap:30px}
+.brand{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:500;flex:none}
+.brand-mark{width:28px;height:28px;border:1px solid var(--line);border-radius:8px;
+  display:grid;place-items:center;color:var(--amber);background:rgba(214,163,86,.07)}
+.brand-mark .i{width:15px;height:15px}
+.nav-links{display:flex;align-items:center;gap:2px}
+.nav-links a{padding:8px 11px;border-radius:8px;font-size:13px;color:var(--tx2);
+  transition:color .18s var(--ease),background-color .18s var(--ease)}
+.nav-links a:hover{color:var(--tx);background:rgba(226,235,222,.05)}
+.nav-actions{margin-inline-start:auto;display:flex;align-items:center;gap:18px}
+.link-quiet{font-size:13px;color:var(--tx2);transition:color .18s var(--ease)}
+.link-quiet:hover{color:var(--tx)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;
+  padding-inline:22px;border-radius:var(--r);font-size:13.5px;font-weight:500;
+  border:1px solid transparent;cursor:pointer;white-space:nowrap;
+  transition:background-color .18s var(--ease),border-color .18s var(--ease),color .18s var(--ease)}
+.btn--primary{background:var(--amber);color:#12100B}
+.btn--primary:hover{background:#E3B266}
+.btn--ghost{border-color:var(--line);color:var(--tx);background:rgba(21,24,20,.55)}
+.btn--ghost:hover{border-color:rgba(226,235,222,.24)}
+.btn--sm{height:36px;padding-inline:15px;font-size:12.5px}
+
+/* ── hero card ─────────────────────────────────────────── */
+.hero{position:relative;z-index:1;padding-block:64px 48px}
+.hero-card{position:relative;background:rgba(18,21,17,.94);border:1px solid var(--line);
+  border-radius:var(--r4);overflow:hidden;box-shadow:0 50px 140px rgba(0,0,0,.55)}
+.card-top{display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:14px 20px;border-bottom:1px solid var(--line);background:rgba(21,24,20,.9)}
+.card-brand{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--tx2)}
+.card-brand .brand-mark{width:22px;height:22px;border-radius:6px}
+.card-meta{display:flex;align-items:center;gap:14px;font-family:var(--mono);font-size:10px;
+  color:var(--tx3);direction:ltr}
+.card-meta .on{display:flex;align-items:center;gap:6px;color:var(--tx2)}
+.card-meta .on::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--ok)}
+.hero-body{display:grid;grid-template-columns:1.02fr .98fr;align-items:stretch}
+.hero-copy{padding:56px 48px 52px}
+.eyebrow{display:flex;align-items:center;gap:12px;font-family:var(--mono);font-size:10.5px;
+  color:var(--tx3);margin-bottom:24px;direction:ltr;unicode-bidi:isolate;flex-wrap:wrap}
+.eyebrow b{color:var(--tx2);font-weight:400}
+.eyebrow .sep{width:16px;height:1px;background:var(--line)}
+h1{font-size:clamp(30px,3.4vw,46px);line-height:1.28;font-weight:500;letter-spacing:-.01em;
+  max-width:17ch;text-wrap:balance}
+.lede{margin-top:20px;font-size:15px;line-height:1.95;color:var(--tx2);max-width:44ch}
+.hero-actions{margin-top:30px;display:flex;gap:10px;flex-wrap:wrap}
+
+/* map visual */
+.hero-map{position:relative;border-inline-start:1px solid var(--line);min-height:480px;
+  background:#0F120D;overflow:hidden}
+.mapviz-svg{position:absolute;inset:0;width:100%;height:100%}
+.hero-map::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:linear-gradient(180deg,rgba(11,12,10,.35),transparent 24%,transparent 72%,rgba(11,12,10,.86))}
+.map-ui{position:absolute;z-index:3;inset-inline:16px;display:flex;align-items:center;
+  justify-content:space-between;gap:10px}
+.map-ui--top{top:16px}
+.seg{display:flex;gap:2px;padding:3px;border-radius:999px;background:rgba(11,12,10,.78);
+  border:1px solid rgba(226,235,222,.14)}
+.seg span{display:inline-flex;align-items:center;gap:6px;height:27px;padding-inline:11px;
+  border-radius:999px;font-size:10.5px;color:rgba(233,238,229,.72)}
+.seg span.is-on{background:rgba(214,163,86,.92);color:#12100B}
+.seg .i{width:13px;height:13px}
+.map-tools{display:flex;gap:7px}
+.tool{display:grid;place-items:center;width:34px;height:34px;border-radius:9px;
+  background:rgba(11,12,10,.78);border:1px solid rgba(226,235,222,.14);color:#E9EEE5}
+.tool .i{width:15px;height:15px}
+.map-pin{position:absolute;z-index:2;left:46%;top:52%;transform:translate(-50%,-50%);color:var(--amber)}
+.map-pin .ring{position:absolute;inset:-26px;border-radius:50%;
+  border:1px solid rgba(214,163,86,.45);animation:halo 3.4s ease-out infinite}
+.map-pin .ring2{position:absolute;inset:-13px;border-radius:50%;
+  border:1px solid rgba(214,163,86,.55)}
+@keyframes halo{0%{transform:scale(.75);opacity:.9}70%{transform:scale(1.4);opacity:0}100%{opacity:0}}
+.map-pin svg{width:30px;height:30px;filter:drop-shadow(0 6px 14px rgba(0,0,0,.5))}
+.map-lab{position:absolute;z-index:2;font-size:9.5px;color:rgba(233,238,229,.72);
+  background:rgba(11,12,10,.66);padding:2px 6px;border-radius:4px;white-space:nowrap}
+.map-lab--route{left:18%;bottom:26%}
+.map-lab--park{right:8%;top:14%}
+.map-lab--target{left:46%;top:52%;transform:translate(14px,-40px)}
+.map-status{position:absolute;z-index:3;inset-inline:16px;bottom:14px;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:9px 13px;border-radius:11px;background:rgba(11,12,10,.78);
+  border:1px solid rgba(226,235,222,.14)}
+.map-status .st{display:flex;align-items:center;gap:7px;font-size:10.5px;color:#E9EEE5}
+.map-status .st::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--ok)}
+.map-status .co{font-size:10.5px;color:rgba(233,238,229,.82)}
+
+/* rail */
+.rail{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);
+  background:rgba(21,24,20,.9)}
+.rail-cell{padding:15px 20px;border-inline-start:1px solid var(--line2)}
+.rail-cell:first-child{border-inline-start:0}
+.rail-cell .k{display:block;font-family:var(--mono);font-size:9.5px;color:var(--tx3);
+  direction:ltr;text-align:right}
+.rail-cell .v{display:block;margin-top:3px;font-size:12.5px;color:var(--tx)}
+.rail-cell .v.mono{font-size:11.5px;color:var(--tx2)}
+
+/* sections */
+.sec{position:relative;z-index:1;padding-block:104px}
+.sec-head{display:grid;grid-template-columns:minmax(0,.94fr) minmax(0,1.06fr);
+  gap:56px;align-items:end;margin-bottom:52px}
+.index{display:flex;align-items:center;gap:12px;font-family:var(--mono);font-size:10.5px;
+  color:var(--tx3);margin-bottom:16px;direction:ltr;unicode-bidi:isolate}
+.index b{color:var(--amber);font-weight:400;font-size:11.5px}
+h2{font-size:clamp(26px,2.9vw,38px);line-height:1.34;font-weight:500;max-width:21ch}
+.sec-head p{color:var(--tx2);font-size:14px;line-height:1.95;max-width:56ch}
+
+/* app cards */
+.app-cards{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.app-card{position:relative;background:rgba(21,24,20,.95);border:1px solid var(--line);
+  border-radius:var(--r3);padding:24px;display:flex;flex-direction:column;overflow:hidden;
+  transition:border-color .2s var(--ease)}
+.app-card:hover{border-color:rgba(214,163,86,.35)}
+.app-card::before{content:"";position:absolute;top:-1px;inset-inline-start:-1px;width:15px;height:15px;
+  border-top:1px solid var(--amber);border-inline-start:1px solid var(--amber);opacity:.5}
+.app-top{display:flex;align-items:center;gap:14px}
+.app-icon{width:54px;height:54px;border-radius:14px;border:1px solid var(--line)}
+.app-id h3{font-size:18px;font-weight:500}
+.app-id p{margin-top:2px;font-size:11px;color:var(--tx3)}
+.app-state{margin-inline-start:auto;display:flex;align-items:center;gap:6px;font-size:10.5px;
+  color:var(--tx2);border:1px solid var(--line);border-radius:999px;padding:4px 9px}
+.app-state::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--ok)}
+.app-list{margin-top:20px;border-top:1px solid var(--line2)}
+.app-list li{display:flex;align-items:center;gap:10px;padding-block:10px;
+  border-bottom:1px solid var(--line2);font-size:12px;color:var(--tx2)}
+.app-list .i{width:14px;height:14px;color:var(--tx3)}
+.app-foot{display:flex;justify-content:space-between;margin-top:16px;font-size:10px;color:var(--tx3)}
+.note{margin-top:26px;padding:16px 20px;border:1px solid var(--line);
+  border-inline-start:2px solid var(--amber);border-radius:var(--r2);background:rgba(21,24,20,.55)}
+.note .tag{display:block;font-family:var(--mono);font-size:9px;color:var(--amber);
+  letter-spacing:.08em;margin-bottom:6px;direction:ltr;text-align:right}
+.note p{font-size:12px;line-height:1.95;color:var(--tx2);max-width:84ch}
+
+/* features */
+.features{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:var(--r3);overflow:hidden}
+.feature{background:var(--surface);padding:26px 24px;transition:background-color .2s var(--ease)}
+.feature:hover{background:var(--surface2)}
+.feature .n{font-family:var(--mono);font-size:10px;color:var(--tx3);direction:ltr;text-align:right}
+.feature .ico{display:flex;align-items:center;justify-content:center;width:36px;height:36px;
+  border:1px solid var(--line);border-radius:9px;color:var(--amber);margin-top:16px}
+.feature .ico .i{width:16px;height:16px}
+.feature h3{margin-top:14px;font-size:15px;font-weight:500}
+.feature p{margin-top:8px;font-size:12px;line-height:1.95;color:var(--tx2);max-width:38ch}
+
+/* plan */
+.plan{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:64px;align-items:start}
+.plan-copy > p{margin-top:14px;color:var(--tx2);font-size:14px;line-height:1.95;max-width:50ch}
+.facts{margin-top:26px;border-top:1px solid var(--line)}
+.facts li{display:flex;justify-content:space-between;gap:16px;padding-block:12px;
+  border-bottom:1px solid var(--line2);font-size:12.5px;color:var(--tx2)}
+.facts b{font-weight:400;color:var(--tx)}
+.plan-actions{margin-top:28px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.pass{background:var(--surface);border:1px solid var(--line);border-radius:var(--r3);
+  padding:24px;box-shadow:0 30px 80px rgba(0,0,0,.45);position:relative}
+.pass::before{content:"";position:absolute;top:-1px;inset-inline-start:-1px;width:16px;height:16px;
+  border-top:1px solid var(--amber);border-inline-start:1px solid var(--amber);opacity:.55}
+.pass-top{display:flex;align-items:center;justify-content:space-between}
+.pass-brand{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--tx2)}
+.pass-brand .brand-mark{width:22px;height:22px;border-radius:6px}
+.pass-state{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--tx2)}
+.pass-chip{margin-top:20px;width:46px;height:31px;opacity:.95}
+.pass-title{margin-top:18px;font-family:var(--mono);font-size:9px;color:var(--tx3);
+  letter-spacing:.08em;direction:ltr;text-align:right}
+.pass-key{margin-top:8px;padding:14px 16px;background:rgba(11,12,10,.85);border:1px solid var(--line);
+  border-radius:var(--r);font-family:var(--mono);font-size:13px;letter-spacing:.08em;
+  color:var(--tx);direction:ltr;text-align:left}
+.pass-rows{margin-top:18px}
+.pass-row{display:flex;justify-content:space-between;align-items:center;padding-block:9px;
+  border-top:1px solid var(--line2);font-size:11.5px;color:var(--tx3)}
+.pass-row b{font-weight:400;color:var(--tx);font-family:var(--mono);font-size:11.5px}
+.pass-foot{display:flex;justify-content:space-between;margin-top:16px;font-size:10px;color:var(--tx3)}
+.terms{margin-top:64px;border-top:1px solid var(--line)}
+.terms h3{font-size:12.5px;font-weight:500;color:var(--tx2);padding-block:20px 10px}
+.terms li{display:flex;gap:18px;padding-block:10px;border-top:1px solid var(--line2);
+  font-size:12px;line-height:1.9;color:var(--tx2)}
+.terms li .n{font-family:var(--mono);font-size:9.5px;color:var(--tx3);flex:none;width:22px;
+  padding-top:2px;direction:ltr}
+
+/* steps */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:var(--r3);padding:24px}
+.step .n{font-family:var(--mono);font-size:26px;color:rgba(226,235,222,.16);direction:ltr;line-height:1}
+.step .ico{display:flex;align-items:center;justify-content:center;width:36px;height:36px;
+  border:1px solid var(--line);border-radius:9px;color:var(--amber);margin-top:16px}
+.step .ico .i{width:16px;height:16px}
+.step h3{margin-top:14px;font-size:15px;font-weight:500}
+.step p{margin-top:7px;font-size:12px;line-height:1.95;color:var(--tx2)}
+.steps-note{margin-top:18px;font-size:11.5px;color:var(--tx3);display:flex;gap:8px;align-items:center}
+.steps-note .i{width:14px;height:14px}
+
+/* faq */
+.faq-grid{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:64px;align-items:start}
+.faq{background:var(--surface);border:1px solid var(--line);border-radius:var(--r3);overflow:hidden}
+.faq details{border-bottom:1px solid var(--line2)}
+.faq details:last-child{border-bottom:0}
+.faq summary{display:flex;align-items:center;justify-content:space-between;gap:20px;
+  padding:16px 20px;font-size:13.5px;cursor:pointer;list-style:none}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary .i{color:var(--tx3);width:15px;height:15px;transition:transform .18s var(--ease)}
+.faq details[open] summary .i{transform:rotate(180deg)}
+.faq p{padding:0 20px 18px;font-size:12.5px;line-height:1.95;color:var(--tx2);max-width:62ch}
+.faq p a{color:var(--tx);text-decoration:underline;text-underline-offset:3px;
+  text-decoration-color:var(--line)}
+
+/* cta + footer */
+.cta{position:relative;z-index:1;padding-block:0 96px}
+.cta-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r4);
+  padding:38px;display:grid;grid-template-columns:1fr auto;gap:36px;align-items:center;
+  position:relative;overflow:hidden}
+.cta-card::after{content:"";position:absolute;inset-inline-end:-60px;bottom:-80px;width:280px;height:280px;
+  border-radius:50%;border:1px solid rgba(226,235,222,.06);pointer-events:none}
+.cta h2{font-size:clamp(26px,2.9vw,36px)}
+.cta p{margin-top:10px;color:var(--tx2);font-size:13.5px;max-width:54ch}
+.cta-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;position:relative;z-index:1}
+.footer{position:relative;z-index:1;border-top:1px solid var(--line);padding-block:54px;
+  background:rgba(11,12,10,.92)}
+.footer-grid{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:48px}
+.footer-brand p{margin-top:14px;font-size:12px;line-height:1.95;color:var(--tx2);max-width:44ch}
+.footer-col span{display:block;font-family:var(--mono);font-size:9px;color:var(--tx3);
+  letter-spacing:.08em;margin-bottom:10px;direction:ltr;text-align:right}
+.footer-col a{display:block;padding-block:4px;font-size:12px;color:var(--tx2);
+  transition:color .18s var(--ease)}
+.footer-col a:hover{color:var(--tx)}
+.footer-bottom{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);
+  display:flex;justify-content:space-between;gap:16px;font-family:var(--mono);font-size:9.5px;
+  color:var(--tx3);direction:ltr;text-align:left}
+
+@media (prefers-reduced-motion:reduce){.map-pin .ring{animation:none}}
+@media (max-width:1080px){.features{grid-template-columns:1fr 1fr}}
+@media (max-width:980px){
+  .hero{padding-block:40px 36px}
+  .hero-body{grid-template-columns:1fr}
+  .hero-copy{padding:36px 22px 32px}
+  .hero-map{min-height:0;aspect-ratio:4/3;border-inline-start:0;border-top:1px solid var(--line)}
+  .rail{grid-template-columns:1fr 1fr}
+  .rail-cell{border-top:1px solid var(--line2)}
+  .sec{padding-block:64px}
+  .sec-head{grid-template-columns:1fr;gap:14px;margin-bottom:34px}
+  .app-cards{grid-template-columns:1fr}
+  .features{grid-template-columns:1fr}
+  .plan,.faq-grid{grid-template-columns:1fr;gap:32px}
+  .terms{margin-top:48px}
+  .steps{grid-template-columns:1fr}
+  .cta-card{grid-template-columns:1fr;padding:26px}
+  .footer-grid{grid-template-columns:1fr 1fr;gap:30px}
+  .footer-brand{grid-column:1/-1}
+  .wrap{padding-inline:20px}
+  .nav-links{display:none}
+  .nav-actions .link-quiet{display:none}
+  .nav-inner{gap:12px}
+  h1{font-size:clamp(28px,7.6vw,36px)}
+  .footer-bottom{flex-wrap:wrap;gap:6px;justify-content:flex-start}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">تجاوز إلى المحتوى</a>
+<div class="grid-bg" aria-hidden="true"></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.4"/></symbol>
+    <symbol id="i-crosshair" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.6-3 8.4-7 10-4-1.6-7-5.4-7-10V6l7-3z"/><path d="M9.2 12.2l2 2 3.6-4"/></symbol>
+    <symbol id="i-lock-open" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7.5A4 4 0 0 1 15.6 6"/></symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10 5.3A11 11 0 0 1 12 5c7 0 10 7 10 7a16.6 16.6 0 0 1-3.3 4.3"/><path d="M6.3 6.6A17 17 0 0 0 2 12s3 7 10 7a10.7 10.7 0 0 0 5.8-1.7"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></symbol>
+    <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 12V6.5a1.5 1.5 0 0 1 3 0V11"/><path d="M11 11V4.5a1.5 1.5 0 0 1 3 0V11"/><path d="M14 11V6.5a1.5 1.5 0 0 1 3 0V13c0 4-2.7 7-6.5 7S5 17.5 5 13.5V11a1.5 1.5 0 0 1 3 0"/></symbol>
+    <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 2.6-6.4"/><path d="M3 4v5h5"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16.5 16.5L21 21"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></symbol>
+    <symbol id="i-device" viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10 18.5h4"/></symbol>
+  </defs>
+</svg>
+
+<header class="nav">
+  <div class="nav-inner wrap">
+    <a class="brand" href="#"><span class="brand-mark" aria-hidden="true"><svg class="i"><use href="#i-pin"/></svg></span><span>MJ-SPoof</span></a>
+    <nav class="nav-links" aria-label="أقسام الصفحة">
+      <a href="#apps">التغطية</a><a href="#features">المزايا</a><a href="#plan">الاشتراك</a>
+      <a href="#how">طريقة الاستخدام</a><a href="#faq">الأسئلة</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="link-quiet" href="https://mj-spoof.duckdns.org/license" target="_blank" rel="noopener">بوابة الاشتراك</a>
+      <a class="btn btn--primary btn--sm" href="https://t.me/pzll0" target="_blank" rel="noopener">طلب المفتاح</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <div class="wrap">
+      <div class="hero-card">
+        <div class="card-top">
+          <span class="card-brand"><span class="brand-mark" aria-hidden="true"><svg class="i"><use href="#i-pin"/></svg></span> MJ-SPoof · لوحة التحكم</span>
+          <span class="card-meta"><span class="on">CONNECTED</span><span>v1.0.79</span><span>iOS 15.5 – 27</span></span>
+        </div>
+        <div class="hero-body">
+          <div class="hero-copy">
+            <p class="eyebrow"><span><b>iOS</b> 15.5 – 27</span><span class="sep"></span><span>طبقات الخريطة</span><span class="sep"></span><span>دون جيلبريك</span></p>
+            <h1>الموقع الذي تختاره، هو ما يقرأه التطبيق.</h1>
+            <p class="lede">لوحة واحدة داخل التطبيق: تختار الطبقة — قمر صناعي أو هجين أو مخطط — ثم تحدِّد الموقع أو تُدخل إحداثياته، وتُطبّقه. مع تجاوز فحوص الحماية في كل التطبيقات المدعومة، بمفتاح واحد وتطبيق واحد نشط في كل مرة.</p>
+            <div class="hero-actions">
+              <a class="btn btn--primary" href="https://t.me/pzll0" target="_blank" rel="noopener">طلب المفتاح</a>
+              <a class="btn btn--ghost" href="#how">طريقة الاستخدام</a>
+            </div>
+          </div>
+          <div class="hero-map" role="img" aria-label="خريطة توضيحية لطبقات الخريطة وتحديد الهدف">
+            <svg class="mapviz-svg" viewBox="0 0 900 760" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="900" height="760" fill="#0F120D"/><rect x="44" y="-10" width="54" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="106" y="-10" width="42" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="156" y="-10" width="42" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="214" y="-10" width="42" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="272" y="-10" width="80" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="364" y="-10" width="42" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="422" y="-10" width="80" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="588" y="-10" width="42" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="646" y="-10" width="66" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="724" y="-10" width="42" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="774" y="-10" width="66" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="852" y="-10" width="54" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="-10" y="44" width="42" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="44" y="44" width="66" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="118" y="44" width="66" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="196" y="44" width="42" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="254" y="44" width="54" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="320" y="44" width="54" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="382" y="44" width="42" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="436" y="44" width="42" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="494" y="44" width="66" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="572" y="44" width="80" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="660" y="44" width="66" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="742" y="44" width="80" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="-10" y="90" width="54" height="30" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="60" y="90" width="42" height="30" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="114" y="90" width="66" height="30" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="196" y="90" width="42" height="30" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="328" y="90" width="54" height="30" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="398" y="90" width="66" height="30" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="480" y="90" width="42" height="30" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="538" y="90" width="54" height="30" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="608" y="90" width="42" height="30" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="658" y="90" width="42" height="30" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="708" y="90" width="42" height="30" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="758" y="90" width="42" height="30" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="882" y="90" width="54" height="30" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="-10" y="128" width="54" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="60" y="128" width="66" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="138" y="128" width="42" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="192" y="128" width="42" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="320" y="128" width="42" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="374" y="128" width="42" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="432" y="128" width="80" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="528" y="128" width="80" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="690" y="128" width="80" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="782" y="128" width="42" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="832" y="128" width="42" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="882" y="128" width="54" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="-10" y="182" width="54" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="52" y="182" width="80" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="140" y="182" width="42" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="190" y="182" width="42" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="240" y="182" width="80" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="332" y="182" width="42" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="386" y="182" width="66" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="464" y="182" width="80" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="560" y="182" width="80" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="648" y="182" width="42" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="780" y="182" width="80" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="868" y="182" width="42" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="918" y="182" width="42" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="-10" y="232" width="54" height="30" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="60" y="232" width="42" height="30" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="118" y="232" width="66" height="30" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="200" y="232" width="66" height="30" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="274" y="232" width="66" height="30" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="348" y="232" width="80" height="30" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="436" y="232" width="42" height="30" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="490" y="232" width="54" height="30" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="552" y="232" width="66" height="30" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="634" y="232" width="66" height="30" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="716" y="232" width="42" height="30" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="770" y="232" width="42" height="30" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="824" y="232" width="42" height="30" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="882" y="232" width="54" height="30" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="-10" y="278" width="54" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="60" y="278" width="80" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="148" y="278" width="80" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="236" y="278" width="66" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="314" y="278" width="54" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="384" y="278" width="80" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="472" y="278" width="54" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="542" y="278" width="54" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="608" y="278" width="66" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="686" y="278" width="54" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="748" y="278" width="66" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="830" y="278" width="54" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="892" y="278" width="54" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="-10" y="332" width="80" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="78" y="332" width="66" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="152" y="332" width="80" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="240" y="332" width="54" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="306" y="332" width="66" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="380" y="332" width="42" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="434" y="332" width="66" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="512" y="332" width="80" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="658" y="332" width="54" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="720" y="332" width="42" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="778" y="332" width="66" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="852" y="332" width="80" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="86" y="378" width="54" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="156" y="378" width="66" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="230" y="378" width="66" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="308" y="378" width="66" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="390" y="378" width="54" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="456" y="378" width="54" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="522" y="378" width="42" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="576" y="378" width="66" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="658" y="378" width="54" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="720" y="378" width="42" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="852" y="378" width="66" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="-10" y="432" width="54" height="30" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="52" y="432" width="80" height="30" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="148" y="432" width="54" height="30" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="214" y="432" width="80" height="30" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="310" y="432" width="42" height="30" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="364" y="432" width="54" height="30" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="522" y="432" width="42" height="30" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="580" y="432" width="66" height="30" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="662" y="432" width="80" height="30" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="754" y="432" width="54" height="30" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="820" y="432" width="66" height="30" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="898" y="432" width="80" height="30" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="-10" y="470" width="66" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="118" y="470" width="80" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="206" y="470" width="42" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="264" y="470" width="80" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="356" y="470" width="80" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="452" y="470" width="42" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="598" y="470" width="66" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="680" y="470" width="54" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="838" y="470" width="80" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="-10" y="532" width="42" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="102" y="532" width="54" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="164" y="532" width="66" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="242" y="532" width="66" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="320" y="532" width="80" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="412" y="532" width="42" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="466" y="532" width="54" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="528" y="532" width="42" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="578" y="532" width="54" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="648" y="532" width="42" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="702" y="532" width="66" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="784" y="532" width="42" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="838" y="532" width="42" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="896" y="532" width="80" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="56" y="586" width="42" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="106" y="586" width="66" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="184" y="586" width="42" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="234" y="586" width="80" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="326" y="586" width="66" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="408" y="586" width="54" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="478" y="586" width="66" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="556" y="586" width="80" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="652" y="586" width="66" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="726" y="586" width="66" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="804" y="586" width="80" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="896" y="586" width="54" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="-10" y="644" width="66" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="64" y="644" width="42" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="118" y="644" width="54" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="188" y="644" width="80" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="276" y="644" width="66" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="350" y="644" width="66" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="428" y="644" width="66" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="510" y="644" width="66" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="588" y="644" width="66" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="670" y="644" width="54" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="740" y="644" width="54" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="806" y="644" width="66" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="888" y="644" width="66" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="-10" y="690" width="54" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="60" y="690" width="54" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="130" y="690" width="66" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="300" y="690" width="66" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="378" y="690" width="54" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="444" y="690" width="42" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="498" y="690" width="42" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="548" y="690" width="54" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="614" y="690" width="42" height="38" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="672" y="690" width="80" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="760" y="690" width="80" height="38" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="852" y="690" width="80" height="38" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="-10" y="744" width="42" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="48" y="744" width="54" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="110" y="744" width="54" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="172" y="744" width="42" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="230" y="744" width="80" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="322" y="744" width="66" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="396" y="744" width="54" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="466" y="744" width="54" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="528" y="744" width="54" height="46" fill="rgba(226,235,222,.030)" stroke="rgba(226,235,222,.045)"/><rect x="590" y="744" width="42" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="648" y="744" width="66" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="730" y="744" width="66" height="46" fill="rgba(226,235,222,.045)" stroke="rgba(226,235,222,.045)"/><rect x="812" y="744" width="80" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><rect x="900" y="744" width="80" height="46" fill="rgba(226,235,222,.020)" stroke="rgba(226,235,222,.045)"/><path d="M558 76 h234 v167 h-234 z" fill="rgba(127,169,127,.16)" stroke="rgba(127,169,127,.22)"/><path d="M-20 654 C 198 608 342 699 558 654 S 792 593 920 638" fill="none" stroke="rgba(86,118,140,.30)" stroke-width="52"/><path d="M-20 228 H920" stroke="rgba(226,235,222,.13)" stroke-width="12"/><path d="M-20 228 H920" stroke="rgba(226,235,222,.22)" stroke-width="1"/><path d="M-20 471 H920" stroke="rgba(226,235,222,.13)" stroke-width="12"/><path d="M-20 471 H920" stroke="rgba(226,235,222,.22)" stroke-width="1"/><path d="M216 -20 V780" stroke="rgba(226,235,222,.13)" stroke-width="12"/><path d="M216 -20 V780" stroke="rgba(226,235,222,.22)" stroke-width="1"/><path d="M495 -20 V780" stroke="rgba(226,235,222,.13)" stroke-width="12"/><path d="M495 -20 V780" stroke="rgba(226,235,222,.22)" stroke-width="1"/><path d="M738 -20 V780" stroke="rgba(226,235,222,.13)" stroke-width="12"/><path d="M738 -20 V780" stroke="rgba(226,235,222,.22)" stroke-width="1"/><path d="M824 -20 V780" stroke="rgba(226,235,222,.06)" stroke-width="4"/><path d="M-20 431 H920" stroke="rgba(226,235,222,.06)" stroke-width="4"/><path d="M-20 722 H920" stroke="rgba(226,235,222,.06)" stroke-width="4"/><path d="M-20 222 H920" stroke="rgba(226,235,222,.06)" stroke-width="4"/><path d="M658 -20 V780" stroke="rgba(226,235,222,.06)" stroke-width="4"/><path d="M573 -20 V780" stroke="rgba(226,235,222,.06)" stroke-width="4"/><path d="M-20 162 H920" stroke="rgba(226,235,222,.06)" stroke-width="4"/><path d="M-20 472 H920" stroke="rgba(226,235,222,.06)" stroke-width="4"/><path d="M119 -20 V780" stroke="rgba(226,235,222,.06)" stroke-width="4"/><path d="M315 -20 V780" stroke="rgba(226,235,222,.06)" stroke-width="4"/><path d="M-20 625 H920" stroke="rgba(226,235,222,.06)" stroke-width="4"/><path d="M607 -20 V780" stroke="rgba(226,235,222,.06)" stroke-width="4"/><path d="M811 -20 V780" stroke="rgba(226,235,222,.06)" stroke-width="4"/><path d="M-20 414 H920" stroke="rgba(226,235,222,.06)" stroke-width="4"/><path d="M300 -20 V780" stroke="rgba(226,235,222,.06)" stroke-width="4"/><path d="M831 -20 V780" stroke="rgba(226,235,222,.06)" stroke-width="4"/><path d="M920 -20 L-20 780" stroke="rgba(226,235,222,.10)" stroke-width="9"/><circle cx="495" cy="243" r="26" fill="none" stroke="rgba(226,235,222,.16)" stroke-width="6"/><path d="M-30 593 C 162 532 270 471 414 395" fill="none" stroke="rgba(214,163,86,.55)" stroke-width="2" stroke-dasharray="5 6"/><circle cx="414" cy="395" r="46" fill="none" stroke="rgba(214,163,86,.22)" stroke-dasharray="2 6"/><circle cx="414" cy="395" r="22" fill="none" stroke="rgba(214,163,86,.45)" stroke-dasharray="2 4"/><circle cx="414" cy="395" r="6" fill="#D6A356"/><circle cx="774" cy="228" r="5" fill="none" stroke="rgba(226,235,222,.45)"/><path d="M774 228 L430 387" stroke="rgba(226,235,222,.14)" stroke-dasharray="2 5"/></svg>
+            <div class="map-ui map-ui--top">
+              <div class="seg" aria-hidden="true">
+                <span class="is-on"><svg class="i"><use href="#i-layers"/></svg> قمر صناعي</span>
+                <span>هجين</span><span>مخطط</span>
+              </div>
+              <div class="map-tools" aria-hidden="true">
+                <span class="tool"><svg class="i"><use href="#i-crosshair"/></svg></span>
+                <span class="tool"><svg class="i"><use href="#i-pin"/></svg></span>
+              </div>
+            </div>
+            <span class="map-lab map-lab--route">مسار مقترح</span>
+            <span class="map-lab map-lab--park">حديقة</span>
+            <span class="map-pin"><span class="ring"></span><span class="ring2"></span>
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 22s7.5-6.1 7.5-12A7.5 7.5 0 1 0 4.5 10c0 5.9 7.5 12 7.5 12z"/><circle cx="12" cy="10" r="2.6" fill="#12100B"/></svg>
+            </span>
+            <span class="map-lab map-lab--target">الموقع المحدد</span>
+            <div class="map-status">
+              <span class="st">الموقع محدد</span>
+              <span class="co mono">24.713175° N · 46.684465° E</span>
+            </div>
+          </div>
+        </div>
+        <div class="rail">
+          <div class="rail-cell"><span class="k">SUPPORTED</span><span class="v">معاً وحضوري</span></div>
+          <div class="rail-cell"><span class="k">VERSIONS</span><span class="v mono">1.0.18 · 8.3</span></div>
+          <div class="rail-cell"><span class="k">SYSTEM</span><span class="v mono">iOS 15.5 – 27</span></div>
+          <div class="rail-cell"><span class="k">LAYERS</span><span class="v">قمر صناعي · هجين · مخطط</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="apps">
+    <div class="wrap">
+      <div class="sec-head">
+        <div>
+          <p class="index"><b>01</b><span>—</span><span>التغطية</span></p>
+          <h2>تجاوز الحماية والتعامل مع الموقع، لكل التطبيقات المدعومة</h2>
+        </div>
+        <p>تغطي الخدمة تطبيقين: معاً وحضوري. لكل منهما تحديد الموقع، وطبقات الخريطة، وتجاوز فحوص النسخة والجهاز، ويُعلن عن أي تطبيق آخر في بوابة الاشتراك.</p>
+      </div>
+      <div class="app-cards">
+        <article class="app-card">
+          <header class="app-top">
+            <img class="app-icon" src="data:image/png;base64,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" alt="تطبيق معاً">
+            <div class="app-id"><h3>معاً</h3><p class="mono">1.0.18</p></div>
+            <span class="app-state">مدعوم</span>
+          </header>
+          <ul class="app-list">
+            <li><svg class="i"><use href="#i-crosshair"/></svg> تحديد الموقع يدوياً</li>
+            <li><svg class="i"><use href="#i-layers"/></svg> طبقات: قمر صناعي، هجين، مخطط</li>
+            <li><svg class="i"><use href="#i-shield"/></svg> تجاوز فحوص النسخة والجهاز</li>
+            <li><svg class="i"><use href="#i-rotate"/></svg> ثبات بعد إعادة التشغيل</li>
+            <li><svg class="i"><use href="#i-hand"/></svg> لوحة داخل التطبيق</li>
+          </ul>
+          <footer class="app-foot"><span>iOS 15.5 – 27</span><span class="mono">MJ-SPoof</span></footer>
+        </article>
+        <article class="app-card">
+          <header class="app-top">
+            <img class="app-icon" src="data:image/png;base64,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" alt="تطبيق حضوري">
+            <div class="app-id"><h3>حضوري</h3><p class="mono">8.3</p></div>
+            <span class="app-state">مدعوم</span>
+          </header>
+          <ul class="app-list">
+            <li><svg class="i"><use href="#i-crosshair"/></svg> تحديد الموقع يدوياً</li>
+            <li><svg class="i"><use href="#i-layers"/></svg> طبقات: قمر صناعي، هجين، مخطط</li>
+            <li><svg class="i"><use href="#i-shield"/></svg> تجاوز فحوص النسخة والجهاز</li>
+            <li><svg class="i"><use href="#i-rotate"/></svg> ثبات بعد إعادة التشغيل</li>
+            <li><svg class="i"><use href="#i-hand"/></svg> لوحة داخل التطبيق</li>
+          </ul>
+          <footer class="app-foot"><span>iOS 15.5 – 27</span><span class="mono">MJ-SPoof</span></footer>
+        </article>
+      </div>
+      <div class="note">
+        <span class="tag">NOTICE</span>
+        <p>الدعم الحالي مقصور على الإصدارين المذكورين أعلاه. قد تُكشف طريقة تجاوز الحماية في تحديثات مستقبلية للتطبيقات ويصبح تنفيذها أصعب، وقد تتوقف تحديثات التخطي أو يتغيّر نطاق الدعم دون إشعار مسبق، ولا يتحمّل المطوّر مسؤولية ذلك.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="features">
+    <div class="wrap">
+      <div class="sec-head">
+        <div>
+          <p class="index"><b>02</b><span>—</span><span>المزايا</span></p>
+          <h2>ست وظائف في لوحة واحدة</h2>
+        </div>
+        <p>تحديد الموقع، وطبقات الخريطة، وتجاوز الحماية، وثبات الاختيار، واللوحة، والبحث والمفضلة والتذبذب.</p>
+      </div>
+      <div class="features">
+        <article class="feature"><span class="n">01</span><span class="ico"><svg class="i"><use href="#i-crosshair"/></svg></span><h3>تحديد الموقع</h3><p>تحديد النقطة على الخريطة أو إدخال خط العرض وخط الطول مباشرة، ثم تطبيق الموقع.</p></article>
+        <article class="feature"><span class="n">02</span><span class="ico"><svg class="i"><use href="#i-layers"/></svg></span><h3>طبقات الخريطة</h3><p>التبديل بين القمر الصناعي والهجين والمخطط من داخل اللوحة، مع بقاء أدوات التحديد.</p></article>
+        <article class="feature"><span class="n">03</span><span class="ico"><svg class="i"><use href="#i-shield"/></svg></span><h3>تجاوز الحماية</h3><p>تجاوز فحوص النسخة والجهاز في كل التطبيقات المدعومة، دون توقف بعد التفعيل.</p></article>
+        <article class="feature"><span class="n">04</span><span class="ico"><svg class="i"><use href="#i-rotate"/></svg></span><h3>الثبات بعد إعادة التشغيل</h3><p>يعود الموقع المحفوظ تلقائياً مع أول قراءة بعد إعادة فتح التطبيق.</p></article>
+        <article class="feature"><span class="n">05</span><span class="ico"><svg class="i"><use href="#i-hand"/></svg></span><h3>اللوحة داخل التطبيق</h3><p>تُفتح اللوحة من داخل التطبيق: البحث، والطبقات، والإحداثيات، وأزرار التطبيق والإغلاق.</p></article>
+        <article class="feature"><span class="n">06</span><span class="ico"><svg class="i"><use href="#i-search"/></svg></span><h3>البحث والمفضلة والتذبذب</h3><p>البحث عن مكان، وحفظ المواقع المتكررة، وضبط نطاق تذبذب حول النقطة المختارة.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="plan">
+    <div class="wrap">
+      <div class="plan">
+        <div class="plan-copy">
+          <p class="index"><b>03</b><span>—</span><span>الاشتراك</span></p>
+          <h2>مفتاح واحد يغطي التطبيقين</h2>
+          <p>لا يلزم مفتاح لكل تطبيق؛ فالمفتاح نفسه يفعّل اللوحة وتجاوز الحماية في التطبيقين المدعومين، على أن يكون نشطاً في تطبيق واحد في كل مرة.</p>
+          <ul class="facts">
+            <li><b>المفتاح مرتبط بجهاز واحد (UDID)</b><span>لا ينتقل تلقائياً</span></li>
+            <li><b>تطبيق واحد نشط في كل مرة</b><span>أوقف التزييف قبل الانتقال</span></li>
+            <li><b>غير قابل للاسترداد بعد التفعيل</b><span>قبل إصدار المفتاح</span></li>
+          </ul>
+          <div class="plan-actions">
+            <a class="btn btn--primary" href="https://t.me/pzll0" target="_blank" rel="noopener">طلب المفتاح</a>
+            <a class="link-quiet" href="https://mj-spoof.duckdns.org/license" target="_blank" rel="noopener">الاستعلام عن الاشتراك</a>
+          </div>
+        </div>
+        <aside class="pass" aria-label="بطاقة مفتاح التفعيل">
+          <div class="pass-top">
+            <span class="pass-brand"><span class="brand-mark" aria-hidden="true"><svg class="i"><use href="#i-pin"/></svg></span> MJ-SPoof</span>
+            <span class="pass-state"><span class="pp-dot"></span> نشط</span>
+          </div>
+          <div class="pass-chip" aria-hidden="true">
+            <svg viewBox="0 0 50 34"><rect x="1" y="1" width="48" height="32" rx="6" fill="none"
+              stroke="rgba(214,163,86,.45)"/><path d="M1 11h48M1 23h48" stroke="rgba(214,163,86,.22)"/>
+              <rect x="8" y="14" width="14" height="5" rx="2" fill="rgba(214,163,86,.35)"/>
+              <circle cx="39" cy="17" r="5" fill="none" stroke="rgba(214,163,86,.35)"/></svg>
+          </div>
+          <p class="pass-title">ACTIVATION KEY</p>
+          <p class="pass-key">SP-9F3A-K2M7-QX4B</p>
+          <div class="pass-rows">
+            <div class="pass-row"><span>التطبيق النشط</span><b>معاً</b></div>
+            <div class="pass-row"><span>النظام</span><b>iOS 15.5 – 27</b></div>
+            <div class="pass-row"><span>الجهاز</span><b>UDID •••• 7K8W</b></div>
+            <div class="pass-row"><span>الطبقة</span><b>قمر صناعي</b></div>
+            <div class="pass-row"><span>الحالة</span><b>نشط</b></div>
+          </div>
+          <div class="pass-foot"><span>إصدار الأداة</span><span class="mono">MJ-SPoof</span></div>
+        </aside>
+      </div>
+      <div class="terms">
+        <h3>شروط الاشتراك</h3>
+        <ul>
+          <li><span class="n">01</span>الاشتراك غير قابل للاسترداد بعد تفعيل المفتاح.</li>
+          <li><span class="n">02</span>المفتاح مخصّص لجهاز واحد مرتبط برقم UDID، ولا ينتقل تلقائياً إلى جهاز آخر.</li>
+          <li><span class="n">03</span>يعمل المفتاح في تطبيق واحد في كل مرة، ولا يعمل في تطبيقين في الوقت نفسه.</li>
+          <li><span class="n">04</span>إعادة توزيع المفتاح أو مشاركته أو إساءة استخدامه تُبطل الاشتراك دون استرداد.</li>
+          <li><span class="n">05</span>قد تتوقف تحديثات التخطي أو يتغيّر نطاق دعم الإصدارات دون إشعار مسبق.</li>
+          <li><span class="n">06</span>الدعم الفني عبر تيليجرام @pzll0.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="how">
+    <div class="wrap">
+      <div class="sec-head">
+        <div>
+          <p class="index"><b>04</b><span>—</span><span>طريقة الاستخدام</span></p>
+          <h2>ثلاث خطوات داخل التطبيق</h2>
+        </div>
+        <p>بعد تثبيت النسخة الجاهزة، تُفتح اللوحة من داخل التطبيق، وتُختار الطبقة ثم الموقع، دون أي إعداد إضافي على الجهاز.</p>
+      </div>
+      <div class="steps">
+        <div class="step"><span class="n">01</span><span class="ico"><svg class="i"><use href="#i-device"/></svg></span><h3>افتح التطبيق</h3><p>بعد تثبيت النسخة الجاهزة، افتح تطبيق معاً أو حضوري.</p></div>
+        <div class="step"><span class="n">02</span><span class="ico"><svg class="i"><use href="#i-hand"/></svg></span><h3>اضغط مطوّلاً</h3><p>اضغط مطوّلاً بإصبعين داخل التطبيق لتظهر لوحة MJ-SPoof.</p></div>
+        <div class="step"><span class="n">03</span><span class="ico"><svg class="i"><use href="#i-layers"/></svg></span><h3>اختر الطبقة والموقع</h3><p>اختر القمر الصناعي أو الهجين أو المخطط، ثم حدِّد الموقع واختر تطبيق الموقع.</p></div>
+      </div>
+      <p class="steps-note"><svg class="i"><use href="#i-check"/></svg> تطبيق واحد نشط في كل مرة. أوقف التزييف قبل الانتقال إلى تطبيق آخر.</p>
+    </div>
+  </section>
+
+  <section class="sec" id="faq">
+    <div class="wrap">
+      <div class="faq-grid">
+        <div>
+          <p class="index"><b>05</b><span>—</span><span>الأسئلة</span></p>
+          <h2>قبل الاشتراك</h2>
+          <p style="margin-top:12px;color:var(--tx2);font-size:13.5px;line-height:1.95;max-width:42ch">كل ما يخص التغطية والطبقات والتفعيل والشروط، في مكان واحد.</p>
+        </div>
+        <div class="faq">
+          <details open>
+            <summary>هل يشمل الاشتراك معاً وحضوري؟ <svg class="i"><use href="#i-chevron"/></svg></summary>
+            <p>نعم، يغطي الاشتراك تطبيقي معاً وحضوري حالياً، مع تحديد الموقع وطبقات الخريطة وتجاوز الحماية، ويُعلن عن أي تطبيق يُضاف لاحقاً في بوابة الاشتراك.</p>
+          </details>
+          <details>
+            <summary>هل يوجد عرض بالقمر الصناعي؟ <svg class="i"><use href="#i-chevron"/></svg></summary>
+            <p>نعم، توفر اللوحة ثلاث طبقات: القمر الصناعي، والهجين، والمخطط، ويمكن التبديل بينها من داخل اللوحة قبل تثبيت الموقع.</p>
+          </details>
+          <details>
+            <summary>هل يعمل في أكثر من تطبيق في الوقت نفسه؟ <svg class="i"><use href="#i-chevron"/></svg></summary>
+            <p>لا، يعمل المفتاح في تطبيق واحد في كل مرة؛ ويُوقف التزييف قبل الانتقال إلى التطبيق الآخر.</p>
+          </details>
+          <details>
+            <summary>ما إصدار iOS المدعوم؟ <svg class="i"><use href="#i-chevron"/></svg></summary>
+            <p>تدعم الخدمة أجهزة آيفون العاملة بنظام iOS من 15.5 حتى 27.</p>
+          </details>
+          <details>
+            <summary>هل يحتاج جيلبريك؟ <svg class="i"><use href="#i-chevron"/></svg></summary>
+            <p>لا، تعمل الخدمة دون الحاجة إلى جيلبريك.</p>
+          </details>
+          <details>
+            <summary>هل يبقى الموقع بعد إغلاق التطبيق؟ <svg class="i"><use href="#i-chevron"/></svg></summary>
+            <p>نعم، يعود آخر موقع محفوظ عند أول قراءة بعد فتح التطبيق، دون إعادة اختيار.</p>
+          </details>
+          <details>
+            <summary>هل يمكن استرداد قيمة الاشتراك؟ <svg class="i"><use href="#i-chevron"/></svg></summary>
+            <p>لا، الاشتراك غير قابل للاسترداد بعد تفعيل المفتاح.</p>
+          </details>
+          <details>
+            <summary>كيف أفعّل الاشتراك؟ <svg class="i"><use href="#i-chevron"/></svg></summary>
+            <p>يُرسل الطلب عبر تيليجرام، ثم يُدخل المفتاح داخل الأداة. وتُعرض حالة الاشتراك في <a href="https://mj-spoof.duckdns.org/license" target="_blank" rel="noopener">بوابة الاشتراك</a>.</p>
+          </details>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta">
+    <div class="wrap">
+      <div class="cta-card">
+        <div>
+          <h2>طلب المفتاح</h2>
+          <p>يُرسل الطلب عبر تيليجرام، ويصلك مفتاح يفعّل اللوحة وتجاوز الحماية في التطبيقات المدعومة.</p>
+        </div>
+        <div class="cta-actions">
+          <a class="btn btn--primary" href="https://t.me/pzll0" target="_blank" rel="noopener">الطلب عبر تيليجرام</a>
+          <a class="btn btn--ghost" href="https://mj-spoof.duckdns.org/license" target="_blank" rel="noopener">بوابة الاشتراك</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="#"><span class="brand-mark" aria-hidden="true"><svg class="i"><use href="#i-pin"/></svg></span><span>MJ-SPoof</span></a>
+        <p>لوحة تزييف موقع داخل تطبيقي معاً وحضوري: طبقات قمر صناعي وهجين ومخطط، إحداثيات يدوية، وتجاوز فحوص الحماية. مفتاح واحد، تطبيق واحد نشط في كل مرة.</p>
+      </div>
+      <div class="footer-col">
+        <span>PAGE</span>
+        <a href="#apps">التغطية</a><a href="#features">المزايا</a><a href="#plan">الاشتراك</a>
+        <a href="#how">طريقة الاستخدام</a><a href="#faq">الأسئلة</a>
+      </div>
+      <div class="footer-col">
+        <span>CONTACT</span>
+        <a href="https://t.me/pzll0" target="_blank" rel="noopener">تيليجرام @pzll0</a>
+        <a href="https://mj-spoof.duckdns.org/license" target="_blank" rel="noopener">بوابة الاشتراك</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>MJ-SPoof · 2026</span>
+      <span>iOS 15.5 – 27 · معاً 1.0.18 · حضوري 8.3 · قمر صناعي</span>
+    </div>
+  </div>
+</footer>
+</body>
+</html>
